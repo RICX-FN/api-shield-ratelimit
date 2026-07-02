@@ -1,28 +1,38 @@
 import express from 'express';
 import { RedisRateLimiterRepository } from './infra/database/RedisRateLimiterRepository';
+import { connectRedis } from './infra/database/redis';
 import { createRateLimiterMiddleware } from './infra/http/rateLimiterMiddleware';
 
 const app = express();
 app.use(express.json());
 
-// 1. Instanciamos o repositório que comunica com o Redis
-const rateLimiterRepository = new RedisRateLimiterRepository();
+async function bootstrap() {
+  await connectRedis();
 
-// 2. Criamos o middleware configurado (Ex: Máximo de 5 requisições a cada 10 segundos)
-const rateLimiter = createRateLimiterMiddleware(rateLimiterRepository, {
-  limit: 5,
-  windowInSeconds: 10,
-});
+  // 1. Instanciamos o repositório que comunica com o Redis
+  const rateLimiterRepository = new RedisRateLimiterRepository();
 
-// 3. Aplicamos o middleware globalmente ou apenas nas rotas sensíveis
-app.use(rateLimiter);
+  // 2. Criamos o middleware configurado (Ex: Máximo de 5 requisições a cada 10 segundos)
+  const rateLimiter = createRateLimiterMiddleware(rateLimiterRepository, {
+    limit: 5,
+    windowInSeconds: 10,
+  });
 
-// Rota de teste
-app.get('/api/v1/resource', (req, res) => {
-  res.json({ message: 'Sucesso! Conseguiste aceder ao recurso protegido.' });
-});
+  // 3. Aplicamos o middleware globalmente ou apenas nas rotas sensíveis
+  app.use(rateLimiter);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Servidor backend a rodar na porta ${PORT}`);
+  // Rota de teste
+  app.get('/api/v1/resource', (req, res) => {
+    res.json({ message: 'Sucesso! Conseguiste aceder ao recurso protegido.' });
+  });
+
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`Servidor backend a rodar na porta ${PORT}`);
+  });
+}
+
+bootstrap().catch((err) => {
+  console.error('Falha ao arrancar o servidor:', err);
+  process.exit(1);
 });
